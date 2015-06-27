@@ -61,6 +61,8 @@
 
 // LIRC device file
 #define LIRC_DEV                  "/dev/lirc_rpi"
+// Pulse length bits in lirc data
+#define LIRC_LENGTH_MASK          0xFFFFFF
 
 // Bit definitions
 #define BIT_ZERO                  0
@@ -278,57 +280,49 @@ static void Init(void)
   }
 }
 
-
-///***********************************************************************************************************************
-// * Main
-// **********************************************************************************************************************/
-//int main(void)
-//{
-//  // Decoded WT440H data and the previous one
-//  WT440hDataType data, prevData = { 0 };
-//
-//  // Do init stuff
-//  Init();
-//
-//  // Receive and decode messages
-//  while(1) {
-//    // Wait for Message
-//    data = RxData();
-//    // Check if a message is a duplicate of a last one
-//    if((data.houseCode != prevData.houseCode) || (data.channel != prevData.channel) ||
-//        (data.status != prevData.status) || (data.batteryLow != prevData.batteryLow) ||
-//        (data.humidity != prevData.humidity) || (data.tempInteger != prevData.tempInteger) ||
-//        (data.tempFraction != prevData.tempFraction) || ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
-//      // If no duplicate, print
-//      printf("%u %u %u %u %u %.1f\n", data.houseCode, data.channel + 1, data.status, data.batteryLow, data.humidity,
-//        ((double)data.tempInteger - (double)50) + ((double)data.tempFraction / (double)16));
-//      fflush(stdout);
-//    }
-//    // Remember old message
-//    prevData = data;
-//  }
-//
-//  return 0;
-//}
-
+/***********************************************************************************************************************
+ * Main
+ **********************************************************************************************************************/
 int main(void)
 {
+  // Data from lirc driver
   uint32_t lircData;
-  WT440hDataType data;
+  // Decoded WT440H data and the previous one
+  WT440hDataType data, prevData = { 0 };
+
+  // Do init stuff
   Init();
 
+  // Receive and decode messages
   while(1) {
-    // Read Lirc data
+    // Wait and read data from lirc
     if(read(lircDev, &lircData, sizeof(lircData)) != sizeof(lircData)) {
       printf("read()");
       exit(EXIT_FAILURE);
     }
-    lircData &= 0xFFFFFF;
+    // Leave only the pulse length information
+    lircData &= LIRC_LENGTH_MASK;
 
+    // WT440H Messages
     if(WT440hDecode(&data, BiphaseMarkDecode(lircData))) {
-      printf("%u %u %u %u %u %.1f\n", data.houseCode, data.channel + 1, data.status, data.batteryLow, data.humidity,
-        ((double)data.tempInteger - (double)50) + ((double)data.tempFraction / (double)16));
-      fflush(stdout);
+      // Check if a message is a duplicate of a last one
+      if((data.houseCode != prevData.houseCode) || (data.channel != prevData.channel) ||
+          (data.status != prevData.status) || (data.batteryLow != prevData.batteryLow) ||
+          (data.humidity != prevData.humidity) || (data.tempInteger != prevData.tempInteger) ||
+          (data.tempFraction != prevData.tempFraction) || ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
+        double temperature;
+        // No duplicate, convert temperature integer part (off by 50 degrees)
+        temperature = data.tempInteger - 50.0;
+        // Convert friction part
+        temperature += data.tempFraction / 16.0;
+
+        // And Print
+        printf("%u %u %u %u %u %.1f\n", data.houseCode, data.channel + 1, data.status, data.batteryLow, data.humidity,
+          temperature);
+        fflush(stdout);
+      }
+      // Remember old message
+      prevData = data;
     }
   }
 
