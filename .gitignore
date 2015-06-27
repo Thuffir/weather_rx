@@ -1,0 +1,5 @@
+weather_rx
+include
+*.o
+.project
+.cproject
