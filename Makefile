@@ -27,5 +27,4 @@ clean:
 
 install: $(TARGET)
 	$(INSTALL) -s $(TARGET) $(INSTALLDIR)
-	$(INSTALL) wt440h2fhem.sh $(INSTALLDIR)
-	
+	$(INSTALL) weather2fhem.sh $(INSTALLDIR)
