@@ -317,8 +317,8 @@ int main(void)
         temperature += data.tempFraction / 16.0;
 
         // And Print
-        printf("%u %u %u %u %u %.1f\n", data.houseCode, data.channel + 1, data.status, data.batteryLow, data.humidity,
-          temperature);
+        printf("wt440h %u %u %u %u %u %.1f\n", data.houseCode, data.channel + 1, data.status, data.batteryLow,
+          data.humidity, temperature);
         fflush(stdout);
       }
       // Remember old message
