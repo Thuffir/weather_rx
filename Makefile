@@ -4,6 +4,7 @@ CFLAGS = -O3 -Wall -fomit-frame-pointer
 LIBS =
 LFLAGS = -s
 INSTALL = sudo install -m 755 -o fhem -g dialout
+INSTALLDIR = /opt/fhem
 
 .PHONY: default all clean
 
