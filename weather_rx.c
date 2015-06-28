@@ -39,36 +39,26 @@
 #include "wt440h.h"
 
 // LIRC device file
-#define LIRC_DEV                  "/dev/lirc_rpi"
+#define LIRC_DEV          "/dev/lirc_rpi"
 // Pulse length bits in lirc data
-#define LIRC_LENGTH_MASK          0xFFFFFF
-
-// LIRC Device file descriptor
-int lircDev;
-
-/***********************************************************************************************************************
- * Init functions
- **********************************************************************************************************************/
-static void Init(void)
-{
-  // Open device file for reading
-  lircDev = open(LIRC_DEV, O_RDONLY);
-  if(lircDev == -1) {
-    perror("open()");
-    exit(EXIT_FAILURE);
-  }
-}
+#define LIRC_LENGTH_MASK  0xFFFFFF
 
 /***********************************************************************************************************************
  * Main
  **********************************************************************************************************************/
 int main(void)
 {
+  // LIRC Device file descriptor
+  int lircDev;
   // Data from lirc driver
   uint32_t lircData;
 
-  // Do init stuff
-  Init();
+  // Open device file for reading
+  lircDev = open(LIRC_DEV, O_RDONLY);
+  if(lircDev == -1) {
+    perror("open()");
+    exit(EXIT_FAILURE);
+  }
 
   // Receive and decode messages
   while(1) {
