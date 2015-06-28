@@ -31,58 +31,11 @@
  *
  **********************************************************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
+#ifndef WT440H_H_
+#define WT440H_H_
 
-#include "wt440h.h"
+#include <stdint.h>
 
-// LIRC device file
-#define LIRC_DEV                  "/dev/lirc_rpi"
-// Pulse length bits in lirc data
-#define LIRC_LENGTH_MASK          0xFFFFFF
+void WT440hProcess(uint32_t lircData);
 
-// LIRC Device file descriptor
-int lircDev;
-
-/***********************************************************************************************************************
- * Init functions
- **********************************************************************************************************************/
-static void Init(void)
-{
-  // Open device file for reading
-  lircDev = open(LIRC_DEV, O_RDONLY);
-  if(lircDev == -1) {
-    perror("open()");
-    exit(EXIT_FAILURE);
-  }
-}
-
-/***********************************************************************************************************************
- * Main
- **********************************************************************************************************************/
-int main(void)
-{
-  // Data from lirc driver
-  uint32_t lircData;
-
-  // Do init stuff
-  Init();
-
-  // Receive and decode messages
-  while(1) {
-    // Wait and read data from lirc
-    if(read(lircDev, &lircData, sizeof(lircData)) != sizeof(lircData)) {
-      printf("read()");
-      exit(EXIT_FAILURE);
-    }
-    // Leave only the pulse length information
-    lircData &= LIRC_LENGTH_MASK;
-
-    // WT440H Messages
-    WT440hProcess(lircData);
-  }
-
-  return 0;
-}
+#endif // WT440H_H_
