@@ -38,7 +38,7 @@
 #include <sys/time.h>
 
 // Enable if signal is comming through the ananlog filter
-//#define ANALOG_FILTER
+#define ANALOG_FILTER
 
 #ifndef ANALOG_FILTER
 // Bit length in uS
@@ -104,6 +104,11 @@ static BitType BiphaseMarkDecode(uint32_t pulseLength)
   // Return Value
   BitType bit = 0;
 
+  // Low Pass Filter
+  if(pulseLength < HALFBIT_LENGTH_THRES_LOW ) {
+    goto exit;
+  }
+
   // Bit recognition state machine
   switch(state) {
     // Neutral state
@@ -162,6 +167,7 @@ static BitType BiphaseMarkDecode(uint32_t pulseLength)
     lastBit = bit;
   }
 
+  exit:
   return bit;
 }
 
