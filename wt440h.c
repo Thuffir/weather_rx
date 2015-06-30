@@ -95,11 +95,9 @@ typedef struct {
  **********************************************************************************************************************/
 static BitType BiphaseMarkDecode(uint32_t pulseLength)
 {
-  // Internal State for bit recognition
-  static enum {
-    Neutral,
-    HalfOneReceived
-  } state = Neutral;
+  // We will count half bits here
+  static uint8_t halfBits = 0;
+  // Last bit valid or not
   static BitType lastBit = 0;
   // Return Value
   BitType bit = 0;
@@ -109,56 +107,30 @@ static BitType BiphaseMarkDecode(uint32_t pulseLength)
     goto exit;
   }
 
-  // Bit recognition state machine
-  switch(state) {
-    // Neutral state
-    case Neutral: {
-      // Check if zero received
-      if(IS_BIT_FULL_LENGTH(pulseLength)) {
-        // Full bit length, zero received
-        bit = BIT_ZERO | BIT_VALID;
-      }
-      // else check if the first half of a one received
-      else if(IS_BIT_HALF_LENGTH(pulseLength)) {
-        // Half bit length, first half of a zero received
-        state = HalfOneReceived;
-      }
-      // No valid bit part received
-      else {
-        lastBit = 0;
-      }
+  // Check if we have a Zero
+  if(IS_BIT_FULL_LENGTH(pulseLength)) {
+    // Signal that we have received a zero
+    bit = BIT_ZERO | BIT_VALID;
+    // and reset halfbit counter
+    halfBits = 0;
+  }
+  // Or one half of a One
+  else if(IS_BIT_HALF_LENGTH(pulseLength)) {
+    // Count bit halves, and check if we have received all of them
+    if((++halfBits) >= 2) {
+      // if all received, signal One
+      bit = BIT_ONE | BIT_VALID;
+      // and reset halfbit counter
+      halfBits = 0;
     }
-    break;
-
-    // First half of a One already received
-    case HalfOneReceived: {
-      // Check for second half
-      if(IS_BIT_HALF_LENGTH(pulseLength)) {
-        // Second half of a one received
-        bit = BIT_ONE | BIT_VALID;
-      }
-      // Not the second half of a one, but maybe a valid Zero after an invalid one
-      else if(IS_BIT_FULL_LENGTH(pulseLength)) {
-        // Full bit length, zero received
-        bit = BIT_ZERO | BIT_VALID;
-      }
-      // No valid bit part received
-      else {
-        lastBit = 0;
-      }
-      state = Neutral;
-    }
-    break;
-
-    // Invalid state (should not happen)
-    default: {
-      lastBit = 0;
-      state = Neutral;
-    }
-    break;
+  }
+  // we have something invalid
+  else {
+    halfBits = 0;
+    lastBit = 0;
   }
 
-  // Check if we have a valid bit
+  // Chek if we have a valid bit
   if(bit & BIT_VALID) {
     // And mark if it's part of a bit stream
     if(lastBit & BIT_VALID) {
