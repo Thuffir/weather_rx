@@ -154,92 +154,101 @@ static bool WT440hDecode(WT440hDataType *data, BitType bit)
   static uint8_t bitNr = 0;
   // Return value
   bool retval = false;
+  // Recheck some bits
+  bool reCheck;
 
   // Only process valid bits
   if(!(bit & BIT_VALID)) {
     goto exit;
   }
 
-  // Clear all data at the beginning
-  if(bitNr == 0) {
-    memset(data, 0, sizeof(WT440hDataType));
-  }
-  else {
-    // All bits except the first must be in a bit stream
-    if(!(bit & BIT_IN_STREAM)) {
-//      printf("Bit not in stream: %u\n", bitNr);
-      bitNr = 0;
-      goto exit;
-    }
-  }
-  // Remove flags
-  bit &= BIT_ONE;
+  do {
+    // Only Recheck once
+    reCheck = false;
 
-  // Preamble [0 .. 3]
-  if(bitNr <= 3) {
-    if(bit != preamble[bitNr]) {
-//      printf("Wrong preamble %u at bit %u\n", bit, bitNr);
-      bitNr = 0;
-      goto exit;
+    // Clear all data at the beginning
+    if(bitNr == 0) {
+      memset(data, 0, sizeof(WT440hDataType));
     }
-  }
-  // Housecode [4 .. 7]
-  else if((bitNr >= 4) && (bitNr <= 7)) {
-    data->houseCode = (data->houseCode << 1) | bit;
-  }
-  // Channel [8 .. 9]
-  else if((bitNr >= 8) && (bitNr <= 9)) {
-    data->channel = (data->channel << 1) | bit;
-  }
-  // Status [10 .. 11]
-  else if((bitNr >= 10) && (bitNr <= 11)) {
-    data->status = (data->status << 1) | bit;
-  }
-  // Battery Low [12]
-  else if(bitNr == 12) {
-    data->batteryLow = bit;
-  }
-  // Humidity [13 .. 19]
-  else if((bitNr >= 13) && (bitNr <= 19)) {
-    data->humidity = (data->humidity << 1) | bit;
-  }
-  // Temperature (Integer part) [20 .. 27]
-  else if((bitNr >= 20) && (bitNr <= 27)) {
-    data->tempInteger = (data->tempInteger << 1) | bit;
-  }
-  // Temperature (Fractional part) [28 .. 31]
-  else if((bitNr >= 28) && (bitNr <= 31)) {
-    data->tempFraction = (data->tempFraction << 1) | bit;
-  }
-  // Message Sequence [32 .. 33]
-  else if((bitNr >= 32) && (bitNr <= 33)) {
-    data->sequneceNr = (data->sequneceNr << 1) | bit;
-  }
-
-  // Update checksum
-  data->checksum ^= bit << (bitNr & 1);
-  // and check checksum if appropriate
-  if(bitNr == 35) {
-    // If checksum correct
-    if(data->checksum == 0) {
-      // Record reception Timestamp
-      struct timeval tv;
-      gettimeofday(&tv, NULL);
-      data->timeStamp = (tv.tv_sec * 1000000) + tv.tv_usec;
-      retval = true;
-    }
-    // Checksum error
     else {
-//      printf("Checksum error\n");
+      // All bits except the first must be in a bit stream
+      if(!(bit & BIT_IN_STREAM)) {
+//        printf("Bit not in stream: %u\n", bitNr);
+        bitNr = 0;
+        // Check again this bit, maybe it's the start of a new telegram
+        reCheck = true;
+        continue;
+      }
     }
-  }
+    // Remove flags
+    bit &= BIT_ONE;
 
-  // Increment bit pointer
-  bitNr++;
-  // But not more than 36 Bits
-  if(bitNr > 35) {
-    bitNr = 0;
-  }
+    // Preamble [0 .. 3]
+    if(bitNr <= 3) {
+      if(bit != preamble[bitNr]) {
+        //      printf("Wrong preamble %u at bit %u\n", bit, bitNr);
+        bitNr = 0;
+        goto exit;
+      }
+    }
+    // Housecode [4 .. 7]
+    else if((bitNr >= 4) && (bitNr <= 7)) {
+      data->houseCode = (data->houseCode << 1) | bit;
+    }
+    // Channel [8 .. 9]
+    else if((bitNr >= 8) && (bitNr <= 9)) {
+      data->channel = (data->channel << 1) | bit;
+    }
+    // Status [10 .. 11]
+    else if((bitNr >= 10) && (bitNr <= 11)) {
+      data->status = (data->status << 1) | bit;
+    }
+    // Battery Low [12]
+    else if(bitNr == 12) {
+      data->batteryLow = bit;
+    }
+    // Humidity [13 .. 19]
+    else if((bitNr >= 13) && (bitNr <= 19)) {
+      data->humidity = (data->humidity << 1) | bit;
+    }
+    // Temperature (Integer part) [20 .. 27]
+    else if((bitNr >= 20) && (bitNr <= 27)) {
+      data->tempInteger = (data->tempInteger << 1) | bit;
+    }
+    // Temperature (Fractional part) [28 .. 31]
+    else if((bitNr >= 28) && (bitNr <= 31)) {
+      data->tempFraction = (data->tempFraction << 1) | bit;
+    }
+    // Message Sequence [32 .. 33]
+    else if((bitNr >= 32) && (bitNr <= 33)) {
+      data->sequneceNr = (data->sequneceNr << 1) | bit;
+    }
+
+    // Update checksum
+    data->checksum ^= bit << (bitNr & 1);
+    // and check checksum if appropriate
+    if(bitNr == 35) {
+      // If checksum correct
+      if(data->checksum == 0) {
+        // Record reception Timestamp
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        data->timeStamp = (tv.tv_sec * 1000000) + tv.tv_usec;
+        retval = true;
+      }
+      // Checksum error
+      else {
+//        printf("Checksum error\n");
+      }
+    }
+
+    // Increment bit pointer
+    bitNr++;
+    // But not more than 36 Bits
+    if(bitNr > 35) {
+      bitNr = 0;
+    }
+  } while(reCheck);
 
   exit:
   return retval;
