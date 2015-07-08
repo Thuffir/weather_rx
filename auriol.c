@@ -32,50 +32,87 @@
  **********************************************************************************************************************/
 
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
+#include "types.h"
 
-#include "wt440h.h"
-#include "auriol.h"
+#define PULSE_LENGTH       662
+#define ZERO_LENGTH       1780
+#define ONE_LENGTH        3850
 
-// LIRC device file
-#define LIRC_DEV          "/dev/lirc_rpi"
-// Pulse length bits in lirc data
-#define LIRC_LENGTH_MASK  0xFFFFFF
+#define TOLERANCE          200
+
+#define IS_PULSE(length)  ((length >= (PULSE_LENGTH - TOLERANCE)) && (length <= (PULSE_LENGTH + TOLERANCE)))
+#define IS_ZERO(length)   ((length >= (ZERO_LENGTH - TOLERANCE)) && (length <= (ZERO_LENGTH + TOLERANCE)))
+#define IS_ONE(length)    ((length >= (ONE_LENGTH - TOLERANCE)) && (length <= (ONE_LENGTH + TOLERANCE)))
+
 
 /***********************************************************************************************************************
- * Main
+ *
+ *
+ *
  **********************************************************************************************************************/
-int main(void)
+static BitType PulseSpaceDecode(uint32_t pulseLength)
 {
-  // LIRC Device file descriptor
-  int lircDev;
-  // Data from lirc driver
-  uint32_t lircData;
+  static enum {
+    Idle,
+    PulseReceived
+  } state = Idle;
 
-  // Open device file for reading
-  lircDev = open(LIRC_DEV, O_RDONLY);
-  if(lircDev == -1) {
-    perror("open()");
-    exit(EXIT_FAILURE);
-  }
+  // Return Value
+  BitType bit = 0;
+  static BitType inStream = 0;
 
-  // Receive and decode messages
-  while(1) {
-    // Wait and read data from lirc
-    if(read(lircDev, &lircData, sizeof(lircData)) != sizeof(lircData)) {
-      printf("read()");
-      exit(EXIT_FAILURE);
+  switch(state) {
+    case Idle: {
+      if(IS_PULSE(pulseLength)) {
+        state = PulseReceived;
+      }
+      else {
+        inStream = 0;
+      }
     }
-    // Leave only the pulse length information
-    lircData &= LIRC_LENGTH_MASK;
+    break;
 
-    // WT440H Messages
-    WT440hProcess(lircData);
-    // Auriol Messages
-    AuriolProcess(lircData);
+    case PulseReceived: {
+      if(IS_ZERO(pulseLength)) {
+        bit = BIT_ZERO | BIT_VALID | inStream;
+        inStream = BIT_IN_STREAM;
+      }
+      else if(IS_ONE(pulseLength)) {
+        bit = BIT_ONE | BIT_VALID | inStream;
+        inStream = BIT_IN_STREAM;
+      }
+      else {
+        inStream = 0;
+      }
+
+      state = Idle;
+    }
+    break;
+
+    default: {
+      state = Idle;
+    }
+    break;
   }
 
-  return 0;
+  return bit;
+}
+
+/***********************************************************************************************************************
+ *
+ *
+ *
+ **********************************************************************************************************************/
+void AuriolProcess(uint32_t lircData)
+{
+  BitType bit;
+
+  bit = PulseSpaceDecode(lircData);
+  if(bit & BIT_VALID) {
+    if(!(bit & BIT_IN_STREAM)) {
+      printf("\n");
+    }
+    printf("%u ", bit & BIT_ONE);
+    fflush(stdout);
+  }
 }

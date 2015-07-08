@@ -31,51 +31,11 @@
  *
  **********************************************************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
+#ifndef AURIOL_H_
+#define AURIOLH_H_
 
-#include "wt440h.h"
-#include "auriol.h"
+#include <stdint.h>
 
-// LIRC device file
-#define LIRC_DEV          "/dev/lirc_rpi"
-// Pulse length bits in lirc data
-#define LIRC_LENGTH_MASK  0xFFFFFF
+void AuriolProcess(uint32_t lircData);
 
-/***********************************************************************************************************************
- * Main
- **********************************************************************************************************************/
-int main(void)
-{
-  // LIRC Device file descriptor
-  int lircDev;
-  // Data from lirc driver
-  uint32_t lircData;
-
-  // Open device file for reading
-  lircDev = open(LIRC_DEV, O_RDONLY);
-  if(lircDev == -1) {
-    perror("open()");
-    exit(EXIT_FAILURE);
-  }
-
-  // Receive and decode messages
-  while(1) {
-    // Wait and read data from lirc
-    if(read(lircDev, &lircData, sizeof(lircData)) != sizeof(lircData)) {
-      printf("read()");
-      exit(EXIT_FAILURE);
-    }
-    // Leave only the pulse length information
-    lircData &= LIRC_LENGTH_MASK;
-
-    // WT440H Messages
-    WT440hProcess(lircData);
-    // Auriol Messages
-    AuriolProcess(lircData);
-  }
-
-  return 0;
-}
+#endif // AURIOL_H_

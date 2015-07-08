@@ -36,6 +36,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <sys/time.h>
+#include "types.h"
 
 // Enable if signal is comming through the ananlog filter
 #define ANALOG_FILTER
@@ -66,13 +67,6 @@
 
 // Suppress identical messages within this timeframe in uS
 #define SUPPRESS_TIME          1000000
-
-// Bit definitions
-#define BIT_ZERO                  0
-#define BIT_ONE                   1
-#define BIT_IN_STREAM             2
-#define BIT_VALID                 4
-typedef uint8_t BitType;
 
 // Decoded WT440H Message
 typedef struct {
