@@ -32,26 +32,45 @@
  **********************************************************************************************************************/
 
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <string.h>
+#include <sys/time.h>
 #include "types.h"
 
+// Pulse length in us
 #define PULSE_LENGTH       662
+// Space length for bit ZERO in us
 #define ZERO_LENGTH       1780
+// Space length for bit ONE in us
 #define ONE_LENGTH        3850
 
+// Signal timing tolerance
 #define TOLERANCE          200
 
+// Macros for better readibility
 #define IS_PULSE(length)  ((length >= (PULSE_LENGTH - TOLERANCE)) && (length <= (PULSE_LENGTH + TOLERANCE)))
 #define IS_ZERO(length)   ((length >= (ZERO_LENGTH - TOLERANCE)) && (length <= (ZERO_LENGTH + TOLERANCE)))
 #define IS_ONE(length)    ((length >= (ONE_LENGTH - TOLERANCE)) && (length <= (ONE_LENGTH + TOLERANCE)))
 
+// Decoded data
+typedef struct {
+  uint8_t id;
+  uint8_t battery;
+  uint8_t status;
+  uint8_t button;
+  int16_t temperature;
+  uint8_t humidity;
+  uint8_t checksum;
+  uint32_t timeStamp;
+} AuriolData;
 
 /***********************************************************************************************************************
- *
- *
- *
+ * Pulse / Space Length Decoder
  **********************************************************************************************************************/
 static BitType PulseSpaceDecode(uint32_t pulseLength)
 {
+  // Internal State
   static enum {
     Idle,
     PulseReceived
@@ -59,28 +78,37 @@ static BitType PulseSpaceDecode(uint32_t pulseLength)
 
   // Return Value
   BitType bit = 0;
+  // Are bits in a stream (no interruptions between)
   static BitType inStream = 0;
 
+  // Bit reception state machine
   switch(state) {
+    // No pulse received yet
     case Idle: {
+      // Check for pulse
       if(IS_PULSE(pulseLength)) {
         state = PulseReceived;
       }
+      // else Following bit not in stream
       else {
         inStream = 0;
       }
     }
     break;
 
+    // Pulse received before
     case PulseReceived: {
+      // check for zero
       if(IS_ZERO(pulseLength)) {
         bit = BIT_ZERO | BIT_VALID | inStream;
         inStream = BIT_IN_STREAM;
       }
+      // else check for one
       else if(IS_ONE(pulseLength)) {
         bit = BIT_ONE | BIT_VALID | inStream;
         inStream = BIT_IN_STREAM;
       }
+      // else Following bit not in stream
       else {
         inStream = 0;
       }
@@ -89,6 +117,7 @@ static BitType PulseSpaceDecode(uint32_t pulseLength)
     }
     break;
 
+    // Invalid state (should not happen)
     default: {
       state = Idle;
     }
@@ -100,19 +129,115 @@ static BitType PulseSpaceDecode(uint32_t pulseLength)
 
 /***********************************************************************************************************************
  *
- *
+ **********************************************************************************************************************/
+static bool AuriolDecode(AuriolData *data, BitType bit)
+{
+  // Bit number counter
+  static uint8_t bitNr = 0;
+  // Checksum calculation
+  static uint8_t checksum = 0;
+  // Return value
+  bool retval = false;
+  // Recheck some bits
+  bool reCheck;
+
+  // Only process valid bits
+  if(!(bit & BIT_VALID)) {
+    goto exit;
+  }
+
+  do {
+    // Only Recheck once
+    reCheck = false;
+
+    // Clear all data at the beginning
+    if(bitNr == 0) {
+      memset(data, 0, sizeof(AuriolData));
+      data->checksum = 0xF;
+      checksum = 0;
+    }
+    else {
+      // All bits except the first must be in a bit stream
+      if(!(bit & BIT_IN_STREAM)) {
+//        printf("Bit not in stream: %u\n", bitNr);
+        bitNr = 0;
+        // Check again this bit, maybe it's the start of a new telegram
+        reCheck = true;
+        continue;
+      }
+    }
+    // Remove flags
+    bit &= BIT_ONE;
+
+    // ID [0 .. 7]
+    if(bitNr <= 7) {
+      data->id = (data->id >> 1) | (bit << 7);
+    }
+    // Battery [8]
+    else if(bitNr == 8) {
+      data->battery = bit;
+    }
+    // Status [9 .. 10]
+    else if((bitNr >= 9) && (bitNr <= 10)) {
+      data->status = (data->status >> 1) | (bit << 1);
+    }
+    // Button [11]
+    else if(bitNr == 11) {
+      data->button = bit;
+    }
+    // Temperature [12 .. 23]
+    else if((bitNr >= 12) && (bitNr <= 23)) {
+      data->temperature = (data->temperature >> 1) | (bit << 11);
+    }
+    // Humidity [24 .. 31]
+    else if((bitNr >= 24) && (bitNr <= 31)) {
+      data->humidity = (data->humidity >> 1) | (bit << 7);
+    }
+
+    // Update checksum
+    checksum = (checksum >> 1) | (bit << 3);
+    if(((bitNr + 1) & 3) == 0) {
+      data->checksum = (data->checksum - checksum) & 0xF;
+    }
+
+    // and check checksum if appropriate
+    if(bitNr == 35) {
+      // If checksum and packet type correct
+      if((data->checksum == 0) && (data->status != 3)) {
+        // Record reception Timestamp
+        struct timeval tv;
+        gettimeofday(&tv, NULL);
+        data->timeStamp = (tv.tv_sec * 1000000) + tv.tv_usec;
+        // Make the temperature a 16 bit value
+        retval = true;
+      }
+      // Checksum error
+      else {
+//        printf("Checksum error\n");
+      }
+    }
+
+
+    // Increment bit pointer
+    bitNr++;
+    // But not more than 36 Bits
+    if(bitNr > 35) {
+      bitNr = 0;
+    }
+  } while(reCheck);
+
+  exit:
+  return retval;
+}
+
+/***********************************************************************************************************************
  *
  **********************************************************************************************************************/
 void AuriolProcess(uint32_t lircData)
 {
-  BitType bit;
-
-  bit = PulseSpaceDecode(lircData);
-  if(bit & BIT_VALID) {
-    if(!(bit & BIT_IN_STREAM)) {
-      printf("\n");
-    }
-    printf("%u ", bit & BIT_ONE);
+  static AuriolData data = { 0 };
+  if(AuriolDecode(&data, PulseSpaceDecode(lircData))) {
+    printf("%u, %u, %u, %u, %u, %x, %u\n", data.id, data.battery, data.status, data.button, data.temperature, data.humidity, data.checksum);
     fflush(stdout);
   }
 }
