@@ -131,7 +131,7 @@ static BitType PulseSpaceDecode(uint32_t pulseLength)
 }
 
 /***********************************************************************************************************************
- *
+ * Auriol Message Decoder
  **********************************************************************************************************************/
 static bool AuriolDecode(AuriolData *data, BitType bit)
 {
@@ -237,21 +237,27 @@ static bool AuriolDecode(AuriolData *data, BitType bit)
 }
 
 /***********************************************************************************************************************
- *
+ * Process Bits for Auriol
  **********************************************************************************************************************/
 void AuriolProcess(uint32_t lircData)
 {
+  // Decoded Auriol data and the previous one
   static AuriolData data, prevData = { 0 };
 
+  // Auriol Messages
   if(AuriolDecode(&data, PulseSpaceDecode(lircData))) {
+    // Check if a message is a duplicate of a last one
     if((data.id != prevData.id) || (data.battery != prevData.battery) || (data.status != prevData.status) ||
         (data.button == 1) || (data.temperature != prevData.temperature) || (data.humidity != prevData.humidity) ||
         ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
+      // No duplicate, convert temperature
       double temperature = data.temperature / 10.0;
+      // And Print
       printf("auriol %u %u %u %u %.1f %x\n",
         data.id, data.battery, data.status, data.button, temperature, data.humidity);
       fflush(stdout);
     }
+    // Remember old message
     prevData = data;
   }
 }
