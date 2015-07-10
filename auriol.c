@@ -53,6 +53,9 @@
 #define IS_ZERO(length)   ((length >= (ZERO_LENGTH - TOLERANCE)) && (length <= (ZERO_LENGTH + TOLERANCE)))
 #define IS_ONE(length)    ((length >= (ONE_LENGTH - TOLERANCE)) && (length <= (ONE_LENGTH + TOLERANCE)))
 
+// Suppress identical messages within this timeframe in uS
+#define SUPPRESS_TIME     1000000
+
 // Decoded data
 typedef struct {
   uint8_t id;
@@ -208,7 +211,10 @@ static bool AuriolDecode(AuriolData *data, BitType bit)
         struct timeval tv;
         gettimeofday(&tv, NULL);
         data->timeStamp = (tv.tv_sec * 1000000) + tv.tv_usec;
-        // Make the temperature a 16 bit value
+        // Make the 12 bit temperature a 16 bit value
+        if(data->temperature & 0x800) {
+          data->temperature |= 0xF000;
+        }
         retval = true;
       }
       // Checksum error
@@ -235,9 +241,17 @@ static bool AuriolDecode(AuriolData *data, BitType bit)
  **********************************************************************************************************************/
 void AuriolProcess(uint32_t lircData)
 {
-  static AuriolData data = { 0 };
+  static AuriolData data, prevData = { 0 };
+
   if(AuriolDecode(&data, PulseSpaceDecode(lircData))) {
-    printf("%u, %u, %u, %u, %u, %x, %u\n", data.id, data.battery, data.status, data.button, data.temperature, data.humidity, data.checksum);
-    fflush(stdout);
+    if((data.id != prevData.id) || (data.battery != prevData.battery) || (data.status != prevData.status) ||
+        (data.button == 1) || (data.temperature != prevData.temperature) || (data.humidity != prevData.humidity) ||
+        ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
+      double temperature = data.temperature / 10.0;
+      printf("auriol %u %u %u %u %.1f %x\n",
+        data.id, data.battery, data.status, data.button, temperature, data.humidity);
+      fflush(stdout);
+    }
+    prevData = data;
   }
 }
