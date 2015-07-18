@@ -37,21 +37,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include "types.h"
-
-// Pulse length in us
-#define PULSE_LENGTH       662
-// Space length for bit ZERO in us
-#define ZERO_LENGTH       1780
-// Space length for bit ONE in us
-#define ONE_LENGTH        3850
-
-// Signal timing tolerance
-#define TOLERANCE          200
-
-// Macros for better readibility
-#define IS_PULSE(length)  ((length >= (PULSE_LENGTH - TOLERANCE)) && (length <= (PULSE_LENGTH + TOLERANCE)))
-#define IS_ZERO(length)   ((length >= (ZERO_LENGTH - TOLERANCE)) && (length <= (ZERO_LENGTH + TOLERANCE)))
-#define IS_ONE(length)    ((length >= (ONE_LENGTH - TOLERANCE)) && (length <= (ONE_LENGTH + TOLERANCE)))
+#include "DecodePulseSpace.h"
 
 // Suppress identical messages within this timeframe in uS
 #define SUPPRESS_TIME     1000000
@@ -67,68 +53,6 @@ typedef struct {
   uint8_t checksum;
   uint32_t timeStamp;
 } AuriolData;
-
-/***********************************************************************************************************************
- * Pulse / Space Length Decoder
- **********************************************************************************************************************/
-static BitType PulseSpaceDecode(uint32_t pulseLength)
-{
-  // Internal State
-  static enum {
-    Idle,
-    PulseReceived
-  } state = Idle;
-
-  // Return Value
-  BitType bit = 0;
-  // Are bits in a stream (no interruptions between)
-  static BitType inStream = 0;
-
-  // Bit reception state machine
-  switch(state) {
-    // No pulse received yet
-    case Idle: {
-      // Check for pulse
-      if(IS_PULSE(pulseLength)) {
-        state = PulseReceived;
-      }
-      // else Following bit not in stream
-      else {
-        inStream = 0;
-      }
-    }
-    break;
-
-    // Pulse received before
-    case PulseReceived: {
-      // check for zero
-      if(IS_ZERO(pulseLength)) {
-        bit = BIT_ZERO | BIT_VALID | inStream;
-        inStream = BIT_IN_STREAM;
-      }
-      // else check for one
-      else if(IS_ONE(pulseLength)) {
-        bit = BIT_ONE | BIT_VALID | inStream;
-        inStream = BIT_IN_STREAM;
-      }
-      // else Following bit not in stream
-      else {
-        inStream = 0;
-      }
-
-      state = Idle;
-    }
-    break;
-
-    // Invalid state (should not happen)
-    default: {
-      state = Idle;
-    }
-    break;
-  }
-
-  return bit;
-}
 
 /***********************************************************************************************************************
  * Auriol Message Decoder
@@ -245,7 +169,7 @@ void AuriolProcess(uint32_t lircData)
   static AuriolData data, prevData = { 0 };
 
   // Auriol Messages
-  if(AuriolDecode(&data, PulseSpaceDecode(lircData))) {
+  if(AuriolDecode(&data, DecodePulseSpace(lircData))) {
     // Check if a message is a duplicate of a last one
     if((data.id != prevData.id) || (data.battery != prevData.battery) || (data.status != prevData.status) ||
         (data.button == 1) || (data.temperature != prevData.temperature) || (data.humidity != prevData.humidity) ||
