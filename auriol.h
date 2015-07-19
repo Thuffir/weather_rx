@@ -36,6 +36,6 @@
 
 #include <stdint.h>
 
-void AuriolProcess(uint32_t lircData);
+void AuriolProcess(BitType bit);
 
 #endif // AURIOL_H_

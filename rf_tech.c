@@ -44,24 +44,21 @@
 // Decoded data
 typedef struct {
   uint8_t id;
-  uint8_t battery;
   uint8_t status;
-  uint8_t button;
-  int16_t temperature;
-  uint8_t humidity;
-  uint8_t checksum;
+  uint8_t temperatureInteger;
+  uint8_t temperatureFraction;
   uint32_t timeStamp;
-} AuriolData;
+} RFTechData;
+// Temperature Sign bit
+#define TEMP_SIGN_BIT      (1 << 7)
 
 /***********************************************************************************************************************
- * Auriol Message Decoder
+ * RF-Tech Message Decoder
  **********************************************************************************************************************/
-static bool AuriolDecode(AuriolData *data, BitType bit)
+static bool RFTechDecode(RFTechData *data, BitType bit)
 {
   // Bit number counter
   static uint8_t bitNr = 0;
-  // Checksum calculation
-  static uint8_t checksum = 0;
   // Return value
   bool retval = false;
   // Recheck some bits
@@ -78,9 +75,7 @@ static bool AuriolDecode(AuriolData *data, BitType bit)
 
     // Clear all data at the beginning
     if(bitNr == 0) {
-      memset(data, 0, sizeof(AuriolData));
-      data->checksum = 0xF;
-      checksum = 0;
+      memset(data, 0, sizeof(RFTechData));
     }
     else {
       // All bits except the first must be in a bit stream
@@ -97,60 +92,35 @@ static bool AuriolDecode(AuriolData *data, BitType bit)
 
     // ID [0 .. 7]
     if(bitNr <= 7) {
-      data->id = (data->id >> 1) | (bit << 7);
+      data->id = (data->id << 1) | bit;
     }
-    // Battery [8]
-    else if(bitNr == 8) {
-      data->battery = bit;
+    // Temperature Integer Part [8 .. 15]
+    else if((bitNr >= 8) && (bitNr <= 15)) {
+      data->temperatureInteger = (data->temperatureInteger << 1) | bit;
     }
-    // Status [9 .. 10]
-    else if((bitNr >= 9) && (bitNr <= 10)) {
-      data->status = (data->status >> 1) | (bit << 1);
+    // Status [16 .. 19]
+    else if((bitNr >= 16) && (bitNr <= 19)) {
+      data->status = (data->status << 1) | bit;
     }
-    // Button [11]
-    else if(bitNr == 11) {
-      data->button = bit;
-    }
-    // Temperature [12 .. 23]
-    else if((bitNr >= 12) && (bitNr <= 23)) {
-      data->temperature = (data->temperature >> 1) | (bit << 11);
-    }
-    // Humidity [24 .. 31]
-    else if((bitNr >= 24) && (bitNr <= 31)) {
-      data->humidity = (data->humidity >> 1) | (bit << 7);
+    // Temperature Fraction Part [20 .. 23]
+    else if((bitNr >= 20) && (bitNr <= 23)) {
+      data->temperatureFraction = (data->temperatureFraction << 1) | bit;
     }
 
-    // Update checksum
-    checksum = (checksum >> 1) | (bit << 3);
-    if(((bitNr + 1) & 3) == 0) {
-      data->checksum = (data->checksum - checksum) & 0xF;
-    }
-
-    // and check checksum if appropriate
-    if(bitNr == 35) {
-      // If checksum and packet type correct
-      if((data->checksum == 0) && (data->status != 3)) {
-        // Record reception Timestamp
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
-        data->timeStamp = (tv.tv_sec * 1000000) + tv.tv_usec;
-        // Make the 12 bit temperature a 16 bit value
-        if(data->temperature & 0x800) {
-          data->temperature |= 0xF000;
-        }
-        retval = true;
-      }
-      // Checksum error
-      else {
-//        printf("Checksum error\n");
-      }
+    // Check if we have received everything
+    if(bitNr == 23) {
+      // Record reception Timestamp
+      struct timeval tv;
+      gettimeofday(&tv, NULL);
+      data->timeStamp = (tv.tv_sec * 1000000) + tv.tv_usec;
+      retval = true;
     }
 
 
     // Increment bit pointer
     bitNr++;
     // But not more than 36 Bits
-    if(bitNr > 35) {
+    if(bitNr > 23) {
       bitNr = 0;
     }
   } while(reCheck);
@@ -162,22 +132,24 @@ static bool AuriolDecode(AuriolData *data, BitType bit)
 /***********************************************************************************************************************
  * Process Bits for Auriol
  **********************************************************************************************************************/
-void AuriolProcess(BitType bit)
+void RFTechProcess(BitType bit)
 {
-  // Decoded Auriol data and the previous one
-  static AuriolData data, prevData = { 0 };
+  // Decoded data and the previous one
+  static RFTechData data, prevData = { 0 };
 
-  // Auriol Messages
-  if(AuriolDecode(&data, bit)) {
+  // Decode Messages
+  if(RFTechDecode(&data, bit)) {
     // Check if a message is a duplicate of a last one
-    if((data.id != prevData.id) || (data.battery != prevData.battery) || (data.status != prevData.status) ||
-        (data.button == 1) || (data.temperature != prevData.temperature) || (data.humidity != prevData.humidity) ||
+    if((data.id != prevData.id) || (data.status != prevData.status) ||
+        (data.temperatureInteger != prevData.temperatureInteger) ||
+        (data.temperatureFraction != prevData.temperatureFraction) ||
         ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
       // No duplicate, convert temperature
-      double temperature = data.temperature / 10.0;
+      double temperature;
+      temperature = data.temperatureInteger & (~TEMP_SIGN_BIT);
+      temperature += data.temperatureFraction / 10.0;
       // And Print
-      printf("auriol %u %u %u %u %.1f %x\n",
-        data.id, data.battery, data.status, data.button, temperature, data.humidity);
+      printf("rftech %u %u %.1f\n",data.id, data.status, temperature);
       fflush(stdout);
     }
     // Remember old message

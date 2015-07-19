@@ -31,58 +31,11 @@
  *
  **********************************************************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
+#ifndef RFTECH_H_
+#define RFTECH_H_
 
 #include "types.h"
-#include "wt440h.h"
-#include "DecodePulseSpace.h"
-#include "auriol.h"
-#include "rf_tech.h"
 
-// LIRC device file
-#define LIRC_DEV          "/dev/lirc_rpi"
-// Pulse length bits in lirc data
-#define LIRC_LENGTH_MASK  0xFFFFFF
+void RFTechProcess(BitType bit);
 
-/***********************************************************************************************************************
- * Main
- **********************************************************************************************************************/
-int main(void)
-{
-  // LIRC Device file descriptor
-  int lircDev;
-  // Data from lirc driver
-  uint32_t lircData;
-  // Decoded Bits
-  BitType bit;
-
-  // Open device file for reading
-  lircDev = open(LIRC_DEV, O_RDONLY);
-  if(lircDev == -1) {
-    perror("open()");
-    exit(EXIT_FAILURE);
-  }
-
-  // Receive and decode messages
-  while(1) {
-    // Wait and read data from lirc
-    if(read(lircDev, &lircData, sizeof(lircData)) != sizeof(lircData)) {
-      printf("read()");
-      exit(EXIT_FAILURE);
-    }
-    // Leave only the pulse length information
-    lircData &= LIRC_LENGTH_MASK;
-
-    // WT440H Messages
-    WT440hProcess(lircData);
-    // Auriol Messages
-    bit = DecodePulseSpace(lircData);
-    AuriolProcess(bit);
-//    RFTechProcess(bit);
-  }
-
-  return 0;
-}
+#endif // RFTECH_H_
