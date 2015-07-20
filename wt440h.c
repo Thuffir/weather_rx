@@ -41,9 +41,6 @@
 #include <sys/time.h>
 #include "types.h"
 
-// Enable if signal is comming through the ananlog filter
-#define ANALOG_FILTER
-
 #ifndef ANALOG_FILTER
 // Bit length in uS
 #define BIT_LENGTH                2000
@@ -56,13 +53,13 @@
 #define HALFBIT_LENGTH_THRES_LOW  ((BIT_LENGTH / 2) - BIT_LENGTH_TOLERANCE)
 #define HALFBIT_LENGTH_THRES_HIGH ((BIT_LENGTH / 2) + BIT_LENGTH_TOLERANCE)
 
-#else
+#else // ANALOG_FILTER
 // Somewhat relaxed thresholds for the analog filter
 #define BIT_LENGTH_THRES_LOW      1500
 #define BIT_LENGTH_THRES_HIGH     2400
 #define HALFBIT_LENGTH_THRES_LOW   500
 #define HALFBIT_LENGTH_THRES_HIGH 1400
-#endif
+#endif // ANALOG_FILTER
 
 // Bit length check macros
 #define IS_BIT_FULL_LENGTH(length)  ((length >= BIT_LENGTH_THRES_LOW) && (length <= BIT_LENGTH_THRES_HIGH))

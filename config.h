@@ -34,6 +34,10 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+// Enable if signal is coming through the analog filter
+#define ANALOG_FILTER
+
+// Decoder Modules
 #define MODULE_WT440H_ENABLE
 #define MODULE_AURIOL_ENABLE
 //#define MODULE_RFTECH_ENABLE

@@ -42,12 +42,26 @@
 #include "types.h"
 #include "DecodePulseSpace.h"
 
+#ifndef ANALOG_FILTER
+
+// Pulse length in us
+#define PULSE_LENGTH       500
+// Space length for bit ZERO in us
+#define ZERO_LENGTH       2000
+// Space length for bit ONE in us
+#define ONE_LENGTH        4000
+
+#else // ANALOG_FILTER
+// The Analog filter alters the pulse / space timings
+
 // Pulse length in us
 #define PULSE_LENGTH       662
 // Space length for bit ZERO in us
 #define ZERO_LENGTH       1780
 // Space length for bit ONE in us
 #define ONE_LENGTH        3850
+
+#endif // ANALOG_FILTER
 
 // Signal timing tolerance
 #define TOLERANCE          200
