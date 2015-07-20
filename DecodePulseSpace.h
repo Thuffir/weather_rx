@@ -36,6 +36,24 @@
 
 #include "types.h"
 
-BitType DecodePulseSpace(uint32_t pulseLength);
+// Pulse space decoder context
+typedef struct {
+  // Thresholds for a pulse
+  uint32_t pulseMin;
+  uint32_t pulseMax;
+  // Thresholds for a zero space
+  uint32_t zeroMin;
+  uint32_t zeroMax;
+  // Thresholds for a one space
+  uint32_t oneMin;
+  uint32_t oneMax;
+  // Internal State
+  enum {
+    Idle,
+    PulseReceived
+  } state;
+} PulseSpaceContext;
+
+BitType DecodePulseSpace(PulseSpaceContext *ctx, uint32_t pulseLength);
 
 #endif //DECODE_PULSE_SPACE_H_

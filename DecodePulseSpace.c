@@ -33,44 +33,23 @@
 
 #include "DecodePulseSpace.h"
 
-// Pulse length in us
-#define PULSE_LENGTH       662
-// Space length for bit ZERO in us
-#define ZERO_LENGTH       1780
-// Space length for bit ONE in us
-#define ONE_LENGTH        3850
-
-// Signal timing tolerance
-#define TOLERANCE          200
-
-// Macros for better readibility
-#define IS_PULSE(length)  ((length >= (PULSE_LENGTH - TOLERANCE)) && (length <= (PULSE_LENGTH + TOLERANCE)))
-#define IS_ZERO(length)   ((length >= (ZERO_LENGTH - TOLERANCE)) && (length <= (ZERO_LENGTH + TOLERANCE)))
-#define IS_ONE(length)    ((length >= (ONE_LENGTH - TOLERANCE)) && (length <= (ONE_LENGTH + TOLERANCE)))
-
 /***********************************************************************************************************************
  * Pulse / Space Length Decoder
  **********************************************************************************************************************/
-BitType DecodePulseSpace(uint32_t pulseLength)
+BitType DecodePulseSpace(PulseSpaceContext *ctx, uint32_t pulseLength)
 {
-  // Internal State
-  static enum {
-    Idle,
-    PulseReceived
-  } state = Idle;
-
   // Return Value
   BitType bit = 0;
   // Are bits in a stream (no interruptions between)
   static BitType inStream = 0;
 
   // Bit reception state machine
-  switch(state) {
+  switch(ctx->state) {
     // No pulse received yet
     case Idle: {
       // Check for pulse
-      if(IS_PULSE(pulseLength)) {
-        state = PulseReceived;
+      if((pulseLength >= ctx->pulseMin) && (pulseLength <= ctx->pulseMax)) {
+        ctx->state = PulseReceived;
       }
       // else Following bit not in stream
       else {
@@ -82,12 +61,12 @@ BitType DecodePulseSpace(uint32_t pulseLength)
     // Pulse received before
     case PulseReceived: {
       // check for zero
-      if(IS_ZERO(pulseLength)) {
+      if((pulseLength >= ctx->zeroMin) && (pulseLength <= ctx->zeroMax)) {
         bit = BIT_ZERO | BIT_VALID | inStream;
         inStream = BIT_IN_STREAM;
       }
       // else check for one
-      else if(IS_ONE(pulseLength)) {
+      else if((pulseLength >= ctx->oneMin) && (pulseLength <= ctx->oneMax)) {
         bit = BIT_ONE | BIT_VALID | inStream;
         inStream = BIT_IN_STREAM;
       }
@@ -96,13 +75,13 @@ BitType DecodePulseSpace(uint32_t pulseLength)
         inStream = 0;
       }
 
-      state = Idle;
+      ctx->state = Idle;
     }
     break;
 
     // Invalid state (should not happen)
     default: {
-      state = Idle;
+      ctx->state = Idle;
     }
     break;
   }

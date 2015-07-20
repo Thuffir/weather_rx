@@ -39,7 +39,7 @@
 
 #include <stdint.h>
 
-void AuriolProcess(BitType bit);
+void AuriolProcess(uint32_t pulseLength);
 
 #else // MODULE_AURIOL_ENABLE
 #define AuriolProcess(x)

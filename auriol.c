@@ -40,6 +40,17 @@
 #include <string.h>
 #include <sys/time.h>
 #include "types.h"
+#include "DecodePulseSpace.h"
+
+// Pulse length in us
+#define PULSE_LENGTH       662
+// Space length for bit ZERO in us
+#define ZERO_LENGTH       1780
+// Space length for bit ONE in us
+#define ONE_LENGTH        3850
+
+// Signal timing tolerance
+#define TOLERANCE          200
 
 // Suppress identical messages within this timeframe in uS
 #define SUPPRESS_TIME     1000000
@@ -165,13 +176,23 @@ static bool AuriolDecode(AuriolData *data, BitType bit)
 /***********************************************************************************************************************
  * Process Bits for Auriol
  **********************************************************************************************************************/
-void AuriolProcess(BitType bit)
+void AuriolProcess(uint32_t pulseLength)
 {
+  // Bit decoder context
+  static PulseSpaceContext bitDecoderCtx = {
+    .pulseMin = PULSE_LENGTH - TOLERANCE,
+    .pulseMax = PULSE_LENGTH + TOLERANCE,
+    .zeroMin  = ZERO_LENGTH  - TOLERANCE,
+    .zeroMax  = ZERO_LENGTH  + TOLERANCE,
+    .oneMin   = ONE_LENGTH   - TOLERANCE,
+    .oneMax   = ONE_LENGTH   + TOLERANCE,
+    .state = Idle
+  };
   // Decoded Auriol data and the previous one
   static AuriolData data, prevData = { 0 };
 
   // Auriol Messages
-  if(AuriolDecode(&data, bit)) {
+  if(AuriolDecode(&data, DecodePulseSpace(&bitDecoderCtx, pulseLength))) {
     // Check if a message is a duplicate of a last one
     if((data.id != prevData.id) || (data.battery != prevData.battery) || (data.status != prevData.status) ||
         (data.button == 1) || (data.temperature != prevData.temperature) || (data.humidity != prevData.humidity) ||

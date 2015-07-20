@@ -38,7 +38,6 @@
 
 #include "types.h"
 #include "wt440h.h"
-#include "DecodePulseSpace.h"
 #include "auriol.h"
 #include "rf_tech.h"
 
@@ -56,8 +55,6 @@ int main(void)
   int lircDev;
   // Data from lirc driver
   uint32_t lircData;
-  // Decoded Bits
-  BitType bit;
 
   // Open device file for reading
   lircDev = open(LIRC_DEV, O_RDONLY);
@@ -79,9 +76,9 @@ int main(void)
     // WT440H Messages
     WT440hProcess(lircData);
     // Auriol Messages
-    bit = DecodePulseSpace(lircData);
-    AuriolProcess(bit);
-    RFTechProcess(bit);
+    AuriolProcess(lircData);
+    // RF-Tech Messages
+    RFTechProcess(lircData);
   }
 
   return 0;

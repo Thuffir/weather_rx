@@ -39,7 +39,7 @@
 
 #include "types.h"
 
-void RFTechProcess(BitType bit);
+void RFTechProcess(uint32_t pulseLength);
 
 #else // MODULE_RFTECH_ENABLE
 #define RFTechProcess(x)
