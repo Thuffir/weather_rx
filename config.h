@@ -31,18 +31,11 @@
  *
  **********************************************************************************************************************/
 
-#ifndef AURIOL_H_
-#define AURIOLH_H_
+#ifndef CONFIG_H_
+#define CONFIG_H_
 
-#include "config.h"
-#ifdef MODULE_AURIOL_ENABLE
+#define MODULE_WT440H_ENABLE
+#define MODULE_AURIOL_ENABLE
+//#define MODULE_RFTECH_ENABLE
 
-#include <stdint.h>
-
-void AuriolProcess(BitType bit);
-
-#else // MODULE_AURIOL_ENABLE
-#define AuriolProcess(x)
-#endif // MODULE_AURIOL_ENABLE
-
-#endif // AURIOL_H_
+#endif // CONFIG_H_

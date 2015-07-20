@@ -31,6 +31,9 @@
  *
  **********************************************************************************************************************/
 
+#include "config.h"
+#ifdef MODULE_RFTECH_ENABLE
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -156,3 +159,5 @@ void RFTechProcess(BitType bit)
     prevData = data;
   }
 }
+
+#endif // MODULE_RFTECH_ENABLE

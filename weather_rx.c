@@ -81,7 +81,7 @@ int main(void)
     // Auriol Messages
     bit = DecodePulseSpace(lircData);
     AuriolProcess(bit);
-//    RFTechProcess(bit);
+    RFTechProcess(bit);
   }
 
   return 0;

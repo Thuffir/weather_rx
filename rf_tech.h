@@ -34,8 +34,15 @@
 #ifndef RFTECH_H_
 #define RFTECH_H_
 
+#include "config.h"
+#ifdef MODULE_RFTECH_ENABLE
+
 #include "types.h"
 
 void RFTechProcess(BitType bit);
+
+#else // MODULE_RFTECH_ENABLE
+#define RFTechProcess(x)
+#endif // MODULE_RFTECH_ENABLE
 
 #endif // RFTECH_H_

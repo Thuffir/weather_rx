@@ -31,6 +31,9 @@
  *
  **********************************************************************************************************************/
 
+#include "config.h"
+#ifdef MODULE_AURIOL_ENABLE
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -184,3 +187,5 @@ void AuriolProcess(BitType bit)
     prevData = data;
   }
 }
+
+#endif // MODULE_AURIOL_ENABLE

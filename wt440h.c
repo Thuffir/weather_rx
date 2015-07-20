@@ -31,6 +31,9 @@
  *
  **********************************************************************************************************************/
 
+#include "config.h"
+#ifdef MODULE_WT440H_ENABLE
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -276,3 +279,5 @@ void WT440hProcess(uint32_t lircData)
     prevData = data;
   }
 }
+
+#endif // MODULE_WT440H_ENABLE

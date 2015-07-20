@@ -34,8 +34,15 @@
 #ifndef WT440H_H_
 #define WT440H_H_
 
+#include "config.h"
+#ifdef MODULE_WT440H_ENABLE
+
 #include <stdint.h>
 
 void WT440hProcess(uint32_t lircData);
+
+#else // MODULE_WT440H_ENABLE
+#define WT440hProcess(x)
+#endif // MODULE_WT440H_ENABLE
 
 #endif // WT440H_H_
