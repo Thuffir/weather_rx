@@ -40,8 +40,6 @@ BitType DecodePulseSpace(PulseSpaceContext *ctx, uint32_t pulseLength)
 {
   // Return Value
   BitType bit = 0;
-  // Are bits in a stream (no interruptions between)
-  static BitType inStream = 0;
 
   // Bit reception state machine
   switch(ctx->state) {
@@ -53,7 +51,7 @@ BitType DecodePulseSpace(PulseSpaceContext *ctx, uint32_t pulseLength)
       }
       // else Following bit not in stream
       else {
-        inStream = 0;
+        ctx->inStream = 0;
       }
     }
     break;
@@ -62,17 +60,17 @@ BitType DecodePulseSpace(PulseSpaceContext *ctx, uint32_t pulseLength)
     case PulseReceived: {
       // check for zero
       if((pulseLength >= ctx->zeroMin) && (pulseLength <= ctx->zeroMax)) {
-        bit = BIT_ZERO | BIT_VALID | inStream;
-        inStream = BIT_IN_STREAM;
+        bit = BIT_ZERO | BIT_VALID | (ctx->inStream);
+        ctx->inStream = BIT_IN_STREAM;
       }
       // else check for one
       else if((pulseLength >= ctx->oneMin) && (pulseLength <= ctx->oneMax)) {
-        bit = BIT_ONE | BIT_VALID | inStream;
-        inStream = BIT_IN_STREAM;
+        bit = BIT_ONE | BIT_VALID | (ctx->inStream);
+        ctx->inStream = BIT_IN_STREAM;
       }
       // else Following bit not in stream
       else {
-        inStream = 0;
+        ctx->inStream = 0;
       }
 
       ctx->state = Idle;

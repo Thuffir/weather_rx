@@ -170,7 +170,8 @@ void RFTechProcess(uint32_t pulseLength)
     .zeroMax  = ZERO_LENGTH  + TOLERANCE,
     .oneMin   = ONE_LENGTH   - TOLERANCE,
     .oneMax   = ONE_LENGTH   + TOLERANCE,
-    .state = Idle
+    .state = Idle,
+    .inStream = 0
   };
   // Decoded data and the previous one
   static RFTechData data, prevData = { 0 };

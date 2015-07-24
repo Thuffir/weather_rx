@@ -52,6 +52,8 @@ typedef struct {
     Idle,
     PulseReceived
   } state;
+  // Are bits in a stream (no interruptions between)
+  BitType inStream;
 } PulseSpaceContext;
 
 BitType DecodePulseSpace(PulseSpaceContext *ctx, uint32_t pulseLength);

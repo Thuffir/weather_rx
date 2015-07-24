@@ -200,7 +200,8 @@ void AuriolProcess(uint32_t pulseLength)
     .zeroMax  = ZERO_LENGTH  + TOLERANCE,
     .oneMin   = ONE_LENGTH   - TOLERANCE,
     .oneMax   = ONE_LENGTH   + TOLERANCE,
-    .state = Idle
+    .state = Idle,
+    .inStream = 0
   };
   // Decoded Auriol data and the previous one
   static AuriolData data, prevData = { 0 };

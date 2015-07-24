@@ -67,7 +67,7 @@ int main(void)
   while(1) {
     // Wait and read data from lirc
     if(read(lircDev, &lircData, sizeof(lircData)) != sizeof(lircData)) {
-      printf("read()");
+      perror("read()");
       exit(EXIT_FAILURE);
     }
     // Leave only the pulse length information
