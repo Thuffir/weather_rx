@@ -2,7 +2,7 @@
  *
  * Wireless Weather Station Receiver / Decoder for Raspberry Pi
  *
- * (C) 2015 Gergely Budai
+ * (C) 2015 Gergely Budai, Jens Hoffmann
  *
  * This is free and unencumbered software released into the public domain.
  *
@@ -31,67 +31,18 @@
  *
  **********************************************************************************************************************/
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
+#ifndef WS1700_H_
+#define WS1700_H_
+
+#include "config.h"
+#ifdef MODULE_WS1700_ENABLE
 
 #include "types.h"
-#include "config.h"
-#include "wt440h.h"
-#include "auriol.h"
-#include "rf_tech.h"
-#include "mebus.h"
-#include "ws1700.h"
 
-// Pulse length bits in lirc data
-#define LIRC_LENGTH_MASK  0xFFFFFF
+void Ws1700Process(uint32_t pulseLength);
 
-/***********************************************************************************************************************
- * Main
- **********************************************************************************************************************/
-int main(int argc, char *argv[])
-{
-  // Lirc Device file name
-  char *lircName = DEFAULT_LIRC_DEV;
-  // LIRC Device file descriptor
-  int lircDev;
-  // Data from lirc driver
-  uint32_t lircData;
+#else // MODULE_WS1700_ENABLE
+#define Ws1700Process(x)
+#endif // MODULE_WS1700_ENABLE
 
-  // Check lirc devide name exists on command line
-  if(argc == 2) {
-    lircName = argv[1];
-  }
-
-  // Open device file for reading
-  lircDev = open(lircName, O_RDONLY);
-  if(lircDev == -1) {
-    perror("open()");
-    exit(EXIT_FAILURE);
-  }
-
-  // Receive and decode messages
-  while(1) {
-    // Wait and read data from lirc
-    if(read(lircDev, &lircData, sizeof(lircData)) != sizeof(lircData)) {
-      perror("read()");
-      exit(EXIT_FAILURE);
-    }
-    // Leave only the pulse length information
-    lircData &= LIRC_LENGTH_MASK;
-
-    // WT440H Messages
-    WT440hProcess(lircData);
-    // Auriol Messages
-    AuriolProcess(lircData);
-    // Mebus Messages
-    MebusProcess(lircData);
-    // RF-Tech Messages
-    RFTechProcess(lircData);
-    // WS 1700 Messages
-    Ws1700Process(lircData);
-  }
-
-  return 0;
-}
+#endif // WS1700_H_

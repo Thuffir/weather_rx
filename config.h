@@ -38,12 +38,13 @@
 #define DEFAULT_LIRC_DEV  "/dev/lirc0"
 
 // Enable if signal is coming through the analog filter
-#define ANALOG_FILTER
+//#define ANALOG_FILTER
 
 // Decoder Modules
 #define MODULE_WT440H_ENABLE
 #define MODULE_AURIOL_ENABLE
 //#define MODULE_RFTECH_ENABLE
 //#define MODULE_MEBUS_ENABLE
+//#define MODULE_WS1700_ENABLE
 
 #endif // CONFIG_H_
