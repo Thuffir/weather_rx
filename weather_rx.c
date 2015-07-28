@@ -37,28 +37,34 @@
 #include <fcntl.h>
 
 #include "types.h"
+#include "config.h"
 #include "wt440h.h"
 #include "auriol.h"
 #include "rf_tech.h"
 #include "mebus.h"
 
-// LIRC device file
-#define LIRC_DEV          "/dev/lirc0"
 // Pulse length bits in lirc data
 #define LIRC_LENGTH_MASK  0xFFFFFF
 
 /***********************************************************************************************************************
  * Main
  **********************************************************************************************************************/
-int main(void)
+int main(int argc, char *argv[])
 {
+  // Lirc Device file name
+  char *lircName = DEFAULT_LIRC_DEV;
   // LIRC Device file descriptor
   int lircDev;
   // Data from lirc driver
   uint32_t lircData;
 
+  // Check lirc devide name exists on command line
+  if(argc == 2) {
+    lircName = argv[1];
+  }
+
   // Open device file for reading
-  lircDev = open(LIRC_DEV, O_RDONLY);
+  lircDev = open(lircName, O_RDONLY);
   if(lircDev == -1) {
     perror("open()");
     exit(EXIT_FAILURE);

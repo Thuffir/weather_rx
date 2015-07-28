@@ -34,6 +34,9 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+// Default LIRC device file
+#define DEFAULT_LIRC_DEV  "/dev/lirc0"
+
 // Enable if signal is coming through the analog filter
 #define ANALOG_FILTER
 
