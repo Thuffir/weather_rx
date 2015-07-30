@@ -41,12 +41,17 @@ BitType DecodePulseSpace(PulseSpaceContext *ctx, uint32_t pulseLength)
   // Return Value
   BitType bit = 0;
 
+  // Low pass filter
+  if(pulseLength < ctx->pulseMin) {
+    goto exit;
+  }
+
   // Bit reception state machine
   switch(ctx->state) {
     // No pulse received yet
     case Idle: {
       // Check for pulse
-      if((pulseLength >= ctx->pulseMin) && (pulseLength <= ctx->pulseMax)) {
+      if(pulseLength <= ctx->pulseMax) {
         ctx->state = PulseReceived;
       }
       // else Following bit not in stream
@@ -84,5 +89,6 @@ BitType DecodePulseSpace(PulseSpaceContext *ctx, uint32_t pulseLength)
     break;
   }
 
+  exit:
   return bit;
 }
