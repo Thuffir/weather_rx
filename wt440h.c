@@ -65,8 +65,8 @@
 #define IS_BIT_FULL_LENGTH(length)  ((length >= BIT_LENGTH_THRES_LOW) && (length <= BIT_LENGTH_THRES_HIGH))
 #define IS_BIT_HALF_LENGTH(length)  ((length >= HALFBIT_LENGTH_THRES_LOW) && (length <= HALFBIT_LENGTH_THRES_HIGH))
 
-// Suppress identical messages within this timeframe in uS
-#define SUPPRESS_TIME          1000000
+// Search for identical messages within this timeframe in uS
+#define DUPLICATE_TIME         1000000
 
 // Decoded WT440H Message
 typedef struct {
@@ -247,22 +247,45 @@ static bool WT440hDecode(WT440hDataType *data, BitType bit)
 }
 
 /***********************************************************************************************************************
+ * Check if two messages are equal
+ **********************************************************************************************************************/
+static bool WT440hIsMessageEqual(WT440hDataType *msg1, WT440hDataType *msg2)
+{
+  return(
+      (msg1->houseCode    == msg2->houseCode)    &&
+      (msg1->channel      == msg2->channel)      &&
+      (msg1->status       == msg2->status)       &&
+      (msg1->batteryLow   == msg2->batteryLow)   &&
+      (msg1->humidity     == msg2->humidity)     &&
+      (msg1->tempInteger  == msg2->tempInteger)  &&
+      (msg1->tempFraction == msg2->tempFraction) &&
+      // Messages can only be equal within the duplicate timeframe
+      ((msg1->timeStamp - msg2->timeStamp) < DUPLICATE_TIME)
+      );
+}
+
+/***********************************************************************************************************************
  * Process Bits for WT440H
  **********************************************************************************************************************/
 void WT440hProcess(uint32_t lircData)
 {
   // Decoded WT440H data and the previous one
   static WT440hDataType data, prevData = { 0 };
+  // We will lock on one successful message duplicate
+  static bool lock = false;
 
   // WT440H Messages
   if(WT440hDecode(&data, BiphaseMarkDecode(lircData))) {
-    // Check if a message is a duplicate of a last one
-    if((data.houseCode != prevData.houseCode) || (data.channel != prevData.channel) ||
-        (data.status != prevData.status) || (data.batteryLow != prevData.batteryLow) ||
-        (data.humidity != prevData.humidity) || (data.tempInteger != prevData.tempInteger) ||
-        (data.tempFraction != prevData.tempFraction) || ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
+    // Release lock if we are outside the time frame
+    if((data.timeStamp - prevData.timeStamp) >= DUPLICATE_TIME) {
+      lock = false;
+    }
+    // Check for two successive duplicate messages
+    if(!lock && WT440hIsMessageEqual(&data, &prevData)) {
       double temperature;
-      // No duplicate, convert temperature integer part (off by 50 degrees)
+      // Set lock
+      lock = true;
+      // Convert temperature integer part (off by 50 degrees)
       temperature = data.tempInteger - 50.0;
       // Convert friction part
       temperature += data.tempFraction / 16.0;
