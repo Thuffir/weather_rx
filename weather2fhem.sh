@@ -51,7 +51,7 @@ while read -a data; do
       device="${data[0]}_${data[1]}_${data[2]}"
       temp="${data[5]}"
       humid="${data[6]}"
-      if [ ${data[3]} -eq 1 ]; then
+      if [ ${data[3]} -eq 0 ]; then
         batt_txt="low"
         batt_stat=", Bat.low!"
         warnings="battery"

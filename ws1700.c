@@ -45,29 +45,29 @@
 #ifndef ANALOG_FILTER
 
 // Pulse length in us
-#define PULSE_LENGTH       530
+#define PULSE_LENGTH       480
 // Space length for bit ZERO in us
-#define ZERO_LENGTH       1855
+#define ZERO_LENGTH       1960
 // Space length for bit ONE in us
-#define ONE_LENGTH        3975
+#define ONE_LENGTH        3920
 
 #else // ANALOG_FILTER
 // The Analog filter alters the pulse / space timings
 
 // Pulse length in us
-#define PULSE_LENGTH       662
+#define PULSE_LENGTH       730
 // Space length for bit ZERO in us
-#define ZERO_LENGTH       1780
+#define ZERO_LENGTH       1710
 // Space length for bit ONE in us
-#define ONE_LENGTH        3850
+#define ONE_LENGTH        3670
 
 #endif // ANALOG_FILTER
 
 // Signal timing tolerance
 #define TOLERANCE          200
 
-// Suppress identical messages within this timeframe in uS
-#define SUPPRESS_TIME     1000000
+// Search for identical messages within this timeframe in uS
+#define DUPLICATE_TIME     1000000
 
 // Decoded data
 typedef struct {
@@ -180,6 +180,23 @@ static bool Ws1700Decode(Ws1700Data *data, BitType bit)
 }
 
 /***********************************************************************************************************************
+ * Check if two messages are equal
+ **********************************************************************************************************************/
+static bool Ws1700IsMessageEqual(Ws1700Data *msg1, Ws1700Data *msg2)
+{
+  return(
+      (msg1->id          == msg2->id         ) &&
+      (msg1->battery     == msg2->battery    ) &&
+      (msg1->txMode      == msg2->txMode     ) &&
+      (msg1->channel     == msg2->channel    ) &&
+      (msg1->temperature == msg2->temperature) &&
+      (msg1->humidity    == msg2->humidity   ) &&
+      // Messages can only be equal within the duplicate timeframe
+      ((msg1->timeStamp - msg2->timeStamp) < DUPLICATE_TIME)
+      );
+}
+
+/***********************************************************************************************************************
  * Process Bits for WS1700
  **********************************************************************************************************************/
 void Ws1700Process(uint32_t pulseLength)
@@ -197,21 +214,25 @@ void Ws1700Process(uint32_t pulseLength)
   };
   // Decoded data and the previous one
   static Ws1700Data data, prevData = { 0 };
+  // We will lock on one successful message duplicate
+  static bool lock = false;
 
   // Decode Messages
   if(Ws1700Decode(&data, DecodePulseSpace(&bitDecoderCtx, pulseLength))) {
-    // Check if a message is a duplicate of a last one
-    if((data.id != prevData.id) || (data.battery != prevData.battery) ||
-        (data.channel != prevData.channel) ||
-        (data.txMode != prevData.txMode) ||
-        (data.temperature != prevData.temperature) ||
-        (data.humidity != prevData.humidity) ||
-        ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
-      // No duplicate, convert temperature
+    // Release lock if we are outside the time frame
+    if((data.timeStamp - prevData.timeStamp) >= DUPLICATE_TIME) {
+      lock = false;
+    }
+    // Check for two successive duplicate messages
+    if(!lock && Ws1700IsMessageEqual(&data, &prevData)) {
+      // Set lock
+      lock = true;
+      // Convert temperature
       double temperature;
       temperature = data.temperature / 10.0;
       // And Print
-      printf("ws1700 %u %u %u %u %.1f %u\n",data.id, data.channel, data.battery, data.txMode, temperature, data.humidity);
+      printf("ws1700 %u %u %u %u %.1f %u\n",
+        data.id, data.channel + 1, data.battery, data.txMode, temperature, data.humidity);
       fflush(stdout);
     }
     // Remember old message
