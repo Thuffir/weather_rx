@@ -66,8 +66,8 @@
 // Signal timing tolerance
 #define TOLERANCE          200
 
-// Suppress identical messages within this timeframe in uS
-#define SUPPRESS_TIME     1000000
+// Search for identical messages within this timeframe in uS
+#define DUPLICATE_TIME     1000000
 
 // Decoded data
 typedef struct {
@@ -156,6 +156,21 @@ static bool MebusDecode(MebusData *data, BitType bit)
 }
 
 /***********************************************************************************************************************
+ * Check if two messages are equal
+ **********************************************************************************************************************/
+static bool MebusIsMessageEqual(MebusData *msg1, MebusData *msg2)
+{
+  return(
+      (msg1->id          == msg2->id         ) &&
+      (msg1->status      == msg2->status     ) &&
+      (msg1->temperature == msg2->temperature) &&
+      (msg1->humidity    == msg2->humidity   ) &&
+      // Messages can only be equal within the duplicate timeframe
+      ((msg1->timeStamp - msg2->timeStamp) < DUPLICATE_TIME)
+      );
+}
+
+/***********************************************************************************************************************
  * Process Bits for Mebus YD8220B
  **********************************************************************************************************************/
 void MebusProcess(uint32_t pulseLength)
@@ -173,15 +188,20 @@ void MebusProcess(uint32_t pulseLength)
   };
   // Decoded data and the previous one
   static MebusData data, prevData = { 0 };
+  // We will lock on one successful message duplicate
+  static bool lock = false;
 
   // Decode Messages
   if(MebusDecode(&data, DecodePulseSpace(&bitDecoderCtx, pulseLength))) {
-    // Check if a message is a duplicate of a last one
-    if((data.id != prevData.id) || (data.status != prevData.status) ||
-        (data.temperature != prevData.temperature) ||
-        (data.humidity != prevData.humidity) ||
-        ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
-      // No duplicate, convert temperature
+    // Release lock if we are outside the time frame
+    if((data.timeStamp - prevData.timeStamp) >= DUPLICATE_TIME) {
+      lock = false;
+    }
+    // Check for two successive duplicate messages
+    if(!lock && MebusIsMessageEqual(&data, &prevData)) {
+      // Set lock
+      lock = true;
+      // Convert temperature
       double temperature;
       temperature = data.temperature / 10.0;
       // And Print

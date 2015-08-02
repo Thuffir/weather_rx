@@ -66,8 +66,8 @@
 // Signal timing tolerance
 #define TOLERANCE          200
 
-// Suppress identical messages within this timeframe in uS
-#define SUPPRESS_TIME     1000000
+// Search for identical messages within this timeframe in uS
+#define DUPLICATE_TIME     1000000
 
 // Decoded data
 typedef struct {
@@ -158,6 +158,21 @@ static bool RFTechDecode(RFTechData *data, BitType bit)
 }
 
 /***********************************************************************************************************************
+ * Check if two messages are equal
+ **********************************************************************************************************************/
+static bool RFTechIsMessageEqual(RFTechData *msg1, RFTechData *msg2)
+{
+  return(
+      (msg1->id                  == msg2->id         )         &&
+      (msg1->status              == msg2->status     )         &&
+      (msg1->temperatureInteger  == msg2->temperatureInteger)  &&
+      (msg1->temperatureFraction == msg2->temperatureFraction) &&
+      // Messages can only be equal within the duplicate timeframe
+      ((msg1->timeStamp - msg2->timeStamp) < DUPLICATE_TIME)
+      );
+}
+
+/***********************************************************************************************************************
  * Process Bits for Auriol
  **********************************************************************************************************************/
 void RFTechProcess(uint32_t pulseLength)
@@ -175,15 +190,20 @@ void RFTechProcess(uint32_t pulseLength)
   };
   // Decoded data and the previous one
   static RFTechData data, prevData = { 0 };
+  // We will lock on one successful message duplicate
+  static bool lock = false;
 
   // Decode Messages
   if(RFTechDecode(&data, DecodePulseSpace(&bitDecoderCtx, pulseLength))) {
-    // Check if a message is a duplicate of a last one
-    if((data.id != prevData.id) || (data.status != prevData.status) ||
-        (data.temperatureInteger != prevData.temperatureInteger) ||
-        (data.temperatureFraction != prevData.temperatureFraction) ||
-        ((data.timeStamp - prevData.timeStamp) >= SUPPRESS_TIME)) {
-      // No duplicate, convert temperature
+    // Release lock if we are outside the time frame
+    if((data.timeStamp - prevData.timeStamp) >= DUPLICATE_TIME) {
+      lock = false;
+    }
+    // Check for two successive duplicate messages
+    if(!lock && RFTechIsMessageEqual(&data, &prevData)) {
+      // Set lock
+      lock = true;
+      // Convert temperature
       double temperature;
       temperature = data.temperatureInteger & (~TEMP_SIGN_BIT);
       temperature += data.temperatureFraction / 10.0;
