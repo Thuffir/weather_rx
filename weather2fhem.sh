@@ -6,7 +6,6 @@ PORT=7072
 while read -a data; do
   batt_txt="ok"
   batt_stat=""
-  hum_prefix=""
   warnings="none"
   device=""
   temp=""
@@ -23,7 +22,7 @@ while read -a data; do
         warnings="battery"
       fi
       if [ ${data[5]} -le 14 ]; then
-        hum_prefix="<="
+        humid="0"
       fi
     ;;
 
@@ -36,9 +35,9 @@ while read -a data; do
         batt_stat=", Bat.low!"
         warnings="battery"
       fi
-#      if [ ${data[5]} -le 14 ]; then
-#        hum_prefix="<="
-#      fi
+      if [ ${data[6]} -le 20 ]; then
+        humid="0"
+      fi
     ;;
 
     mebus)
@@ -58,9 +57,18 @@ while read -a data; do
       fi
     ;;
 
+    rftech)
+      device="${data[0]}_${data[1]}"
+      temp="${data[3]}"
+    ;;
+
   esac
 
   if [ -n "${device}" ]; then
-    echo -ne "setreading ${device} temperature ${temp}\nsetreading ${device} humidity ${humid}\nsetreading ${device} battery ${batt_txt}\nsetreading ${device} warnings ${warnings}\nset ${device} ${temp}°C, ${hum_prefix}${humid}%${batt_stat}\n" | nc ${HOST} ${PORT}
+    if [ -n "${humid}" ]; then
+      echo -ne "setreading ${device} temperature ${temp}\nsetreading ${device} humidity ${humid}\nsetreading ${device} battery ${batt_txt}\nsetreading ${device} warnings ${warnings}\nset ${device} ${temp}°C, ${humid}%${batt_stat}\n" | nc ${HOST} ${PORT}
+    else
+      echo -ne "setreading ${device} temperature ${temp}\nsetreading ${device} battery ${batt_txt}\nsetreading ${device} warnings ${warnings}\nset ${device} ${temp}°C${batt_stat}\n" | nc ${HOST} ${PORT}
+    fi
   fi
 done
