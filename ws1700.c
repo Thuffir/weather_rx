@@ -45,21 +45,21 @@
 #ifndef ANALOG_FILTER
 
 // Pulse length in us
-#define PULSE_LENGTH       480
+#define PULSE_LENGTH       500
 // Space length for bit ZERO in us
-#define ZERO_LENGTH       1960
+#define ZERO_LENGTH       2000
 // Space length for bit ONE in us
-#define ONE_LENGTH        3920
+#define ONE_LENGTH        4000
 
 #else // ANALOG_FILTER
 // The Analog filter alters the pulse / space timings
 
 // Pulse length in us
-#define PULSE_LENGTH       730
+#define PULSE_LENGTH       700
 // Space length for bit ZERO in us
-#define ZERO_LENGTH       1710
+#define ZERO_LENGTH       1700
 // Space length for bit ONE in us
-#define ONE_LENGTH        3670
+#define ONE_LENGTH        3700
 
 #endif // ANALOG_FILTER
 
@@ -71,6 +71,7 @@
 
 // Decoded data
 typedef struct {
+  uint8_t preamble;
   uint8_t id;
   uint8_t battery;
   uint8_t txMode;
@@ -78,15 +79,53 @@ typedef struct {
   int16_t temperature;
   uint8_t humidity;
   uint32_t timeStamp;
+  const char *variantStr;
 } Ws1700Data;
+
+/***********************************************************************************************************************
+ * Check sensor variant and set variant string
+ **********************************************************************************************************************/
+static bool Ws1700CheckVariant(Ws1700Data *data)
+{
+  // Supported variants
+  static const struct {
+    uint8_t preamble;
+    const char *variantStr;
+  } variants[] = {
+#ifdef MODULE_WS1700_VARIANT_WS1700
+    // Preamble "0101"
+    {5, "ws1700" },
+#endif
+#ifdef MODULE_WS1700_VARIANT_GT_WT_01
+    // Preamble "1001"
+    {9, "gtwt01" },
+#endif
+    // Closing element
+    {0, NULL }
+  };
+
+  // Is variant known?
+  bool variantKnown = false;
+  uint8_t i;
+
+  // Look up variant
+  for(i = 0; variants[i].variantStr != NULL; i++) {
+    // based on preamble
+    if(data->preamble == variants[i].preamble) {
+      data->variantStr = variants[i].variantStr;
+      variantKnown = true;
+      break;
+    }
+  }
+
+  return variantKnown;
+}
 
 /***********************************************************************************************************************
  * Ws1700 Message Decoder
  **********************************************************************************************************************/
 static bool Ws1700Decode(Ws1700Data *data, BitType bit)
 {
-  // Preamble bits
-  static const uint8_t preamble[] = {0, 1, 0, 1};
   // Bit number counter
   static uint8_t bitNr = 0;
   // Return value
@@ -122,10 +161,15 @@ static bool Ws1700Decode(Ws1700Data *data, BitType bit)
 
     // Preamble [0 .. 3]
     if(bitNr <= 3) {
-      if(bit != preamble[bitNr]) {
-        //      printf("Wrong preamble %u at bit %u\n", bit, bitNr);
-        bitNr = 0;
-        goto exit;
+      data->preamble = (data->preamble << 1) | bit;
+      // Check Sensor type if all preamble bits received
+      if(bitNr == 3) {
+        // Check if variant is known to us
+        if(!Ws1700CheckVariant(data)) {
+//          printf("Wrong preamble %u at bit %u\n", bit, bitNr);
+          bitNr = 0;
+          goto exit;
+        }
       }
     }
     // ID [4 .. 11]
@@ -185,6 +229,7 @@ static bool Ws1700Decode(Ws1700Data *data, BitType bit)
 static bool Ws1700IsMessageEqual(Ws1700Data *msg1, Ws1700Data *msg2)
 {
   return(
+      (msg1->preamble    == msg2->preamble   ) &&
       (msg1->id          == msg2->id         ) &&
       (msg1->battery     == msg2->battery    ) &&
       (msg1->txMode      == msg2->txMode     ) &&
@@ -231,8 +276,8 @@ void Ws1700Process(uint32_t pulseLength)
       double temperature;
       temperature = data.temperature / 10.0;
       // And Print
-      printf("ws1700 %u %u %u %u %.1f %u\n",
-        data.id, data.channel + 1, data.battery, data.txMode, temperature, data.humidity);
+      printf("%s %u %u %u %u %.1f %u\n",
+        data.variantStr, data.id, data.channel + 1, data.battery, data.txMode, temperature, data.humidity);
       fflush(stdout);
     }
     // Remember old message
