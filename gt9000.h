@@ -31,23 +31,18 @@
  *
  **********************************************************************************************************************/
 
-#ifndef CONFIG_H_
-#define CONFIG_H_
+#ifndef GT9000_H_
+#define GT9000_H_
 
-// Default LIRC device file
-#define DEFAULT_LIRC_DEV  "/dev/lirc0"
+#include "config.h"
+#ifdef MODULE_GT9000_ENABLE
 
-// Enable if signal is coming through the analog filter
-//#define ANALOG_FILTER
+#include <stdint.h>
 
-// Decoder Modules
-#define MODULE_WT440H_ENABLE
-#define MODULE_AURIOL_ENABLE
-#define MODULE_RFTECH_ENABLE
-#define MODULE_MEBUS_ENABLE
-#define MODULE_WS1700_ENABLE
-#define MODULE_WS1700_VARIANT_WS1700
-#define MODULE_WS1700_VARIANT_GT_WT_01
-//#define MODULE_GT9000_ENABLE
+void GT9000Process(uint32_t lircData);
 
-#endif // CONFIG_H_
+#else // MODULE_GT9000_ENABLE
+#define GT9000Process(x)
+#endif // MODULE_GT9000_ENABLE
+
+#endif // GT9000_H_

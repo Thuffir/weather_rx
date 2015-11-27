@@ -43,6 +43,7 @@
 #include "rf_tech.h"
 #include "mebus.h"
 #include "ws1700.h"
+#include "gt9000.h"
 
 // Pulse length bits in lirc data
 #define LIRC_LENGTH_MASK  0xFFFFFF
@@ -91,6 +92,8 @@ int main(int argc, char *argv[])
     RFTechProcess(lircData);
     // WS 1700 Messages
     Ws1700Process(lircData);
+    // GT-9000 Remote
+    GT9000Process(lircData);
   }
 
   return 0;
