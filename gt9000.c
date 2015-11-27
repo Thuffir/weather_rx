@@ -90,6 +90,9 @@
 #define IS_START2_SHORT(length) ((length >= START2_SHORT_LEN_MIN) && (length <= START2_SHORT_LEN_MAX))
 #define IS_START2_LONG(length)  ((length >= START2_LONG_LEN_MIN) && (length <= START2_LONG_LEN_MAX))
 
+// Search for identical messages within this timeframe in uS
+#define DUPLICATE_TIME     1000000
+
 // Decoded data
 typedef struct {
   uint8_t channel;
@@ -297,14 +300,47 @@ static bool GT9000Decode(GT9000Data *data, BitType bit)
 }
 
 /***********************************************************************************************************************
+ * Check if two messages are equal
+ **********************************************************************************************************************/
+static bool GT9000IsMessageEqual(GT9000Data *msg1, GT9000Data *msg2)
+{
+  return(
+      (msg1->channel == msg2->channel) &&
+      (msg1->code    == msg2->code   ) &&
+      // Messages can only be equal within the duplicate timeframe
+      ((msg1->timeStamp - msg2->timeStamp) < DUPLICATE_TIME)
+  );
+}
+
+/***********************************************************************************************************************
  *
  **********************************************************************************************************************/
 void GT9000Process(uint32_t lircData)
 {
-  static GT9000Data data;
+  // Decoded data and the previous one
+  static GT9000Data data, prevData = { 0 };
+  // We will lock on one successful message duplicate
+  static bool lock = false;
 
-  if(GT9000Decode(&data, GT9000BitDecode(lircData)) == true) {
-    printf("%02X %04X\n", data.channel, data.code);
+  // Decode Messages
+  if(GT9000Decode(&data, GT9000BitDecode(lircData))) {
+    // Check if actual and previous messages are equal
+    bool equal = GT9000IsMessageEqual(&data, &prevData);
+    // If messages are different
+    if(!equal) {
+      // Release lock
+      lock = false;
+    }
+    // Check for two successive duplicate messages
+    if(!lock && equal) {
+      // Set lock
+      lock = true;
+      // Print
+      printf("GT9000 %02X %02X \n",data.channel, data.code);
+      fflush(stdout);
+    }
+    // Remember old message
+    prevData = data;
   }
 }
 
