@@ -101,7 +101,7 @@ typedef struct {
 } GT9000Data;
 
 /***********************************************************************************************************************
- *
+ * Bit Decoder
  **********************************************************************************************************************/
 BitType GT9000BitDecode(uint32_t pulseLength)
 {
@@ -120,6 +120,7 @@ BitType GT9000BitDecode(uint32_t pulseLength)
   static BitType inStream = 0;
   // Return Value
   BitType bit = 0;
+  // Recheck bit
   bool again = false;
 
   // Low pass filter
@@ -128,6 +129,7 @@ BitType GT9000BitDecode(uint32_t pulseLength)
   }
 
   do {
+    // Only recheck once
     again = false;
     // Bit reception state machine
     switch(state) {
@@ -146,8 +148,10 @@ BitType GT9000BitDecode(uint32_t pulseLength)
       }
       break;
 
+      // First pulse of start 1 bit received
       case Start1ShortReceived: {
         if(IS_START1_LONG(pulseLength)) {
+          // Valid start bit received
           state = BitReception;
         }
         else {
@@ -157,8 +161,10 @@ BitType GT9000BitDecode(uint32_t pulseLength)
       }
       break;
 
+      // First pulse of start 2 bit received
       case Start2ShortReceived: {
         if(IS_START2_LONG(pulseLength)) {
+          // Valid start bit received
           state = BitReception;
         }
         else {
@@ -168,10 +174,13 @@ BitType GT9000BitDecode(uint32_t pulseLength)
       }
       break;
 
+      // Start bit received, bit reception state
       case BitReception: {
+        // First half of a Zero
         if(IS_PULSE_SHORT(pulseLength)) {
           state = HalfZeroReceived;
         }
+        // First half of a One
         else if(IS_PULSE_LONG(pulseLength)) {
           state = HalfOneReceived;
         }
@@ -182,6 +191,7 @@ BitType GT9000BitDecode(uint32_t pulseLength)
       }
       break;
 
+      // First half of a Zero received
       case HalfZeroReceived: {
         if(IS_PULSE_LONG(pulseLength)) {
           bit = BIT_ZERO | BIT_VALID | inStream;
@@ -189,6 +199,8 @@ BitType GT9000BitDecode(uint32_t pulseLength)
           state = BitReception;
         }
         else {
+          // Here we don't go to idle state, since the first half of a zero could be the first half of a type 1 start
+          // bit, so we recheck it.
           state = Start1ShortReceived;
           inStream = 0;
           again = true;
@@ -196,6 +208,7 @@ BitType GT9000BitDecode(uint32_t pulseLength)
       }
       break;
 
+      // First half of a One received
       case HalfOneReceived: {
         if(IS_PULSE_SHORT(pulseLength)) {
           bit = BIT_ONE | BIT_VALID | inStream;
@@ -222,7 +235,7 @@ BitType GT9000BitDecode(uint32_t pulseLength)
 }
 
 /***********************************************************************************************************************
- *
+ * Message Decoder
  **********************************************************************************************************************/
 static bool GT9000Decode(GT9000Data *data, BitType bit)
 {
@@ -313,7 +326,7 @@ static bool GT9000IsMessageEqual(GT9000Data *msg1, GT9000Data *msg2)
 }
 
 /***********************************************************************************************************************
- *
+ * Process Messages
  **********************************************************************************************************************/
 void GT9000Process(uint32_t lircData)
 {
