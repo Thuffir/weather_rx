@@ -31,11 +31,12 @@
  *
  **********************************************************************************************************************/
 
+#include <stdbool.h>
+#include <string.h>
+#include <sys/time.h>
+#include <stdio.h>
 #include "gt9000.h"
 #include "types.h"
-#include <stdbool.h>
-
-#include <stdio.h>
 
 #ifdef MODULE_GT9000_ENABLE
 
@@ -89,11 +90,15 @@
 #define IS_START2_SHORT(length) ((length >= START2_SHORT_LEN_MIN) && (length <= START2_SHORT_LEN_MAX))
 #define IS_START2_LONG(length)  ((length >= START2_LONG_LEN_MIN) && (length <= START2_LONG_LEN_MAX))
 
-
-static int sorl;
+// Decoded data
+typedef struct {
+  uint8_t channel;
+  uint16_t code;
+  uint32_t timeStamp;
+} GT9000Data;
 
 /***********************************************************************************************************************
- * Pulse / Space Length Decoder
+ *
  **********************************************************************************************************************/
 BitType GT9000BitDecode(uint32_t pulseLength)
 {
@@ -140,7 +145,6 @@ BitType GT9000BitDecode(uint32_t pulseLength)
 
       case Start1ShortReceived: {
         if(IS_START1_LONG(pulseLength)) {
-          sorl = 1;
           state = BitReception;
         }
         else {
@@ -152,7 +156,6 @@ BitType GT9000BitDecode(uint32_t pulseLength)
 
       case Start2ShortReceived: {
         if(IS_START2_LONG(pulseLength)) {
-          sorl = 2;
           state = BitReception;
         }
         else {
@@ -215,22 +218,93 @@ BitType GT9000BitDecode(uint32_t pulseLength)
   return bit;
 }
 
+/***********************************************************************************************************************
+ *
+ **********************************************************************************************************************/
+static bool GT9000Decode(GT9000Data *data, BitType bit)
+{
+  // Preamble bits
+  static const uint8_t preamble[] = {1, 1, 0, 0};
+  // Bit number counter
+  static uint8_t bitNr = 0;
+  // Return value
+  bool retval = false;
+  // Recheck some bits
+  bool reCheck;
+
+  // Only process valid bits
+  if(!(bit & BIT_VALID)) {
+    goto exit;
+  }
+
+  do {
+    // Only Recheck once
+    reCheck = false;
+
+    // Clear all data at the beginning
+    if(bitNr == 0) {
+      memset(data, 0, sizeof(GT9000Data));
+    }
+    else {
+      // All bits except the first must be in a bit stream
+      if(!(bit & BIT_IN_STREAM)) {
+//        printf("Bit not in stream: %u\n", bitNr);
+        bitNr = 0;
+        // Check again this bit, maybe it's the start of a new telegram
+        reCheck = true;
+        continue;
+      }
+    }
+    // Remove flags
+    bit &= BIT_ONE;
+
+    // Preamble [0 .. 3]
+    if(bitNr <= 3) {
+      if(bit != preamble[bitNr]) {
+        //      printf("Wrong preamble %u at bit %u\n", bit, bitNr);
+        bitNr = 0;
+        goto exit;
+      }
+    }
+    // Code [4 .. 19]
+    else if((bitNr >= 4) && (bitNr <= 19)) {
+      data->code = (data->code << 1) | bit;
+    }
+    // Channel [20 .. 22]
+    else if((bitNr >= 20) && (bitNr <= 22)) {
+      data->channel = (data->channel << 1) | bit;
+    }
+
+    // Check if we have received everything
+    if(bitNr == 22) {
+      // Record reception Timestamp
+      struct timeval tv;
+      gettimeofday(&tv, NULL);
+      data->timeStamp = (tv.tv_sec * 1000000) + tv.tv_usec;
+      retval = true;
+    }
+
+    // Increment bit pointer
+    bitNr++;
+    // But not more than 24 Bits
+    if(bitNr > 23) {
+      bitNr = 0;
+    }
+  } while(reCheck);
+
+  exit:
+  return retval;
+}
 
 /***********************************************************************************************************************
- * Process Bits for WT440H
+ *
  **********************************************************************************************************************/
 void GT9000Process(uint32_t lircData)
 {
-  BitType bit;
+  static GT9000Data data;
 
-  bit = GT9000BitDecode(lircData);
-  if(bit & BIT_VALID) {
-    if(!(bit & BIT_IN_STREAM)) {
-      printf("\n[%u] ", sorl);
-      fflush(stdout);
-    }
-    printf("%u", bit & BIT_ONE);
-    fflush(stdout);
+  if(GT9000Decode(&data, GT9000BitDecode(lircData)) == true) {
+    printf("%02X %04X\n", data.channel, data.code);
   }
 }
 
