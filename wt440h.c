@@ -276,12 +276,15 @@ void WT440hProcess(uint32_t lircData)
 
   // WT440H Messages
   if(WT440hDecode(&data, BiphaseMarkDecode(lircData))) {
-    // Release lock if we are outside the time frame
-    if((data.timeStamp - prevData.timeStamp) >= DUPLICATE_TIME) {
+    // Check if actual and previous messages are equal
+    bool equal = WT440hIsMessageEqual(&data, &prevData);
+    // If messages are different
+    if(!equal) {
+      // Release lock
       lock = false;
     }
     // Check for two successive duplicate messages
-    if(!lock && WT440hIsMessageEqual(&data, &prevData)) {
+    if(!lock && equal) {
       double temperature;
       // Set lock
       lock = true;

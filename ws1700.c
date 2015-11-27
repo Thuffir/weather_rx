@@ -264,12 +264,15 @@ void Ws1700Process(uint32_t pulseLength)
 
   // Decode Messages
   if(Ws1700Decode(&data, DecodePulseSpace(&bitDecoderCtx, pulseLength))) {
-    // Release lock if we are outside the time frame
-    if((data.timeStamp - prevData.timeStamp) >= DUPLICATE_TIME) {
+    // Check if actual and previous messages are equal
+    bool equal = Ws1700IsMessageEqual(&data, &prevData);
+    // If messages are different
+    if(!equal) {
+      // Release lock
       lock = false;
     }
     // Check for two successive duplicate messages
-    if(!lock && Ws1700IsMessageEqual(&data, &prevData)) {
+    if(!lock && equal) {
       // Set lock
       lock = true;
       // Convert temperature

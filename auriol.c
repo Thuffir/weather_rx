@@ -228,12 +228,15 @@ void AuriolProcess(uint32_t pulseLength)
 
   // Auriol Messages
   if(AuriolDecode(&data, DecodePulseSpace(&bitDecoderCtx, pulseLength))) {
-    // Release lock if we are outside the time frame
-    if((data.timeStamp - prevData.timeStamp) >= DUPLICATE_TIME) {
+    // Check if actual and previous messages are equal
+    bool equal = AuriolIsMessageEqual(&data, &prevData);
+    // If messages are different
+    if(!equal) {
+      // Release lock
       lock = false;
     }
     // Check for two successive duplicate messages
-    if(!lock && AuriolIsMessageEqual(&data, &prevData)) {
+    if(!lock && equal) {
       // Set lock
       lock = true;
       // Convert temperature
