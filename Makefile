@@ -29,3 +29,6 @@ clean:
 install: $(TARGET)
 	$(INSTALL) -s $(TARGET) $(INSTALLDIR)
 	$(INSTALL) weather2fhem.sh $(INSTALLDIR)
+
+instexe: $(TARGET)
+	$(INSTALL) -s $(TARGET) $(INSTALLDIR)
