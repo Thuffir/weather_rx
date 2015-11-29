@@ -93,6 +93,9 @@
 // Search for identical messages within this timeframe in uS
 #define DUPLICATE_TIME     1000000
 
+// Invalid channel
+#define CH_INVALID    255
+
 // Decoded data
 typedef struct {
   uint8_t channel;
@@ -100,10 +103,23 @@ typedef struct {
   uint32_t timeStamp;
 } GT9000Data;
 
+// Code Groups
+typedef enum {
+  CodeGroupA = 0,
+  CodeGroupB = 1,
+  CodeNotFound
+} CodeGroupType;
+
+typedef enum {
+  Off = 0,
+  On  = 1,
+  Invalid
+} StateType;
+
 /***********************************************************************************************************************
  * Bit Decoder
  **********************************************************************************************************************/
-BitType GT9000BitDecode(uint32_t pulseLength)
+static BitType GT9000BitDecode(uint32_t pulseLength)
 {
   // Internal State
   static enum {
@@ -326,6 +342,67 @@ static bool GT9000IsMessageEqual(GT9000Data *msg1, GT9000Data *msg2)
 }
 
 /***********************************************************************************************************************
+ * Convert received channel code to channel number
+ **********************************************************************************************************************/
+static uint8_t GT9000convertChannel(uint8_t channel)
+{
+  static const uint8_t channelTable[] = { 0, 3, 1, CH_INVALID, CH_INVALID, 4, 2 };
+
+  if(channel >= (sizeof(channelTable) / sizeof(channelTable[0]))) {
+    return CH_INVALID;
+  }
+
+  return channelTable[channel];
+}
+
+/***********************************************************************************************************************
+ * Look up code group
+ **********************************************************************************************************************/
+static CodeGroupType GT9000LookUpCode(uint16_t code){
+  static const uint16_t groupA[] = { 0x8F24, 0xC357, 0x57DB, 0xE5C3 };
+  static const uint16_t groupB[] = { 0xBABA, 0x1842, 0x6D01, 0x42F9 };
+  uint8_t i;
+
+  // Look up Group A
+  for(i = 0; i < (sizeof(groupA) / sizeof(groupA[0])); i++) {
+    if(code == groupA[i]) {
+      return CodeGroupA;
+    }
+  }
+
+  // Look up Group B
+  for(i = 0; i < (sizeof(groupB) / sizeof(groupB[0])); i++) {
+    if(code == groupB[i]) {
+      return CodeGroupB;
+    }
+  }
+
+  // Not found
+  return CodeNotFound;
+}
+
+/***********************************************************************************************************************
+ * Map Code group and channel to action
+ **********************************************************************************************************************/
+static StateType GT9000MapCodeToFunction(uint8_t channel, uint16_t code)
+{
+  static const StateType stateTable[2][5] = {
+    // Channel Map:    0    1    2    3    4
+    [CodeGroupA] = { On,   On,  On, Off, Off },
+    [CodeGroupB] = { Off, Off, Off,  On,  On }
+  };
+
+  // Get Code Group
+  CodeGroupType codeGroup = GT9000LookUpCode(code);
+
+  if((channel >= 5) || (codeGroup == CodeNotFound)) {
+    return Invalid;
+  }
+
+  return(stateTable[codeGroup][channel]);
+}
+
+/***********************************************************************************************************************
  * Process Messages
  **********************************************************************************************************************/
 void GT9000Process(uint32_t lircData)
@@ -346,10 +423,12 @@ void GT9000Process(uint32_t lircData)
     }
     // Check for two successive duplicate messages
     if(!lock && equal) {
+      // Convert Channel
+      uint8_t channel = GT9000convertChannel(data.channel);
       // Set lock
       lock = true;
       // Print
-      printf("GT9000 %02X %02X \n",data.channel, data.code);
+      printf("gt9000 %u %u \n",channel, GT9000MapCodeToFunction(channel, data.code));
       fflush(stdout);
     }
     // Remember old message
